@@ -1,8 +1,8 @@
 import json
 import torch
 from networks.main import build_network, build_autoencoder
-from trainer.deepSVDD_trainer import DeepSVDDTrainer
-from trainer.ae_trainer import AETrainer
+from trainers.deepSVDD_trainer import DeepSVDDTrainer
+from trainers.ae_pretrainer import AETrainer
 
 
 class DeepSVDD(object):
@@ -11,7 +11,6 @@ class DeepSVDD(object):
         self.v = v
         self.R = 0.0
         self.c = None
-
         self.type = None
         self.net = None  # neural network \phi
         self.trainer = None
@@ -33,15 +32,14 @@ class DeepSVDD(object):
         self.net = build_network(net_name)
 
     def train(self, dataset, optimizer, lr, n_epochs,
-              lr_milestones, batch_size, weight_decay, device,
-              n_jobs_dataloader):
+              lr_milestones, batch_size, weight_decay, device):
         self.optimizer_name = optimizer
         self.trainer = DeepSVDDTrainer(self.objective, self.R, self.c, self.v, optimizer, lr=lr,
                                        n_epochs=n_epochs, lr_milestones=lr_milestones, batch_size=batch_size,
-                                       weight_decay=weight_decay, device=device, n_jobs_dataloader=n_jobs_dataloader)
+                                       weight_decay=weight_decay, device=device)
         self.net = self.trainer.train(dataset, self.net)
-        self.R = float(self.trainer.R.cpu().data.numpy())  # get float
-        self.c = self.trainer.c.cpu().data.numpy().tolist()  # get list
+        self.R = float(self.trainer.R.cpu().data.numpy())
+        self.c = self.trainer.c.cpu().data.numpy().tolist()
         self.results['train_time'] = self.trainer.train_time
 
     def init_network_weights_from_pretraining(self):
@@ -52,21 +50,19 @@ class DeepSVDD(object):
         self.net.load_state_dict(net_dict)
 
     def pretrain(self, dataset, ae_optimizer, lr, n_epochs,
-                 lr_milestones, batch_size, weight_decay, device,
-                 n_jobs_dataloader):
+                 lr_milestones, batch_size, weight_decay, device):
         self.ae_pretrainer = build_autoencoder(self.type)
         self.optimizer = ae_optimizer
         self.ae_trainer = AETrainer(ae_optimizer, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
-                                    batch_size=batch_size, weight_decay=weight_decay, device=device,
-                                    n_jobs_dataloader=n_jobs_dataloader)
+                                    batch_size=batch_size, weight_decay=weight_decay, device=device)
         self.ae_pretrainer = self.ae_trainer.train(dataset, self.ae_pretrainer)
         self.ae_trainer.test(dataset, self.ae_pretrainer)
         self.init_network_weights_from_pretraining()
 
-    def test(self, dataset, device, n_jobs_dataloader):
+    def test(self, dataset, device):
         if self.trainer is None:
             self.trainer = DeepSVDDTrainer(self.objective, self.R, self.c, self.v,
-                                           device=device, n_jobs_dataloader=n_jobs_dataloader)
+                                           device=device)
         self.trainer.test(dataset, self.net)
         self.results['test_auc'] = self.trainer.test_auc
         self.results['test_time'] = self.trainer.test_time

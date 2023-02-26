@@ -12,14 +12,13 @@ import numpy as np
 class AETrainer(BaseTrainer):
 
     def __init__(self, optimizer_name, lr, n_epochs, lr_milestones,
-                 batch_size, weight_decay, device, n_jobs_dataloader):
-        super().__init__(optimizer_name, lr, n_epochs, lr_milestones, batch_size, weight_decay, device,
-                         n_jobs_dataloader)
+                 batch_size, weight_decay, device):
+        super().__init__(optimizer_name, lr, n_epochs, lr_milestones, batch_size, weight_decay, device)
 
     def train(self, dataset: BaseADDataset, ae_net: BaseNet):
         logger = logging.getLogger()
         ae_net = ae_net.to(self.device)
-        train_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        train_loader, _ = dataset.loaders(batch_size=self.batch_size)
         optimizer = optim.Adam(ae_net.parameters(), lr=self.lr, weight_decay=self.weight_decay,
                                amsgrad=self.optimizer_name == 'amsgrad')
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
@@ -27,11 +26,9 @@ class AETrainer(BaseTrainer):
         start_time = time.time()
         ae_net.train()
         for epoch in range(self.n_epochs):
-
             scheduler.step()
             if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
-
+                logger.info(' LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
             loss_epoch = 0.0
             n_batches = 0
             epoch_start_time = time.time()
@@ -44,7 +41,6 @@ class AETrainer(BaseTrainer):
                 loss = torch.mean(scores)
                 loss.backward()
                 optimizer.step()
-
                 loss_epoch += loss.item()
                 n_batches += 1
             epoch_train_time = time.time() - epoch_start_time
@@ -60,7 +56,7 @@ class AETrainer(BaseTrainer):
     def test(self, dataset: BaseADDataset, ae_net: BaseNet):
         logger = logging.getLogger()
         ae_net = ae_net.to(self.device)
-        _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        _, test_loader = dataset.loaders(batch_size=self.batch_size)
         logger.info('Testing autoencoder...')
         loss_epoch = 0.0
         n_batches = 0

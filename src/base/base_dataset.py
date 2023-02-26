@@ -18,7 +18,7 @@ class BaseADDataset(ABC):
 
     @abstractmethod
     def loaders(self, batch_size: int, shuffle_train=True, shuffle_test=False, num_workers: int = 0) -> (
-            DataLoader, DataLoader):
+            DataLoader):
         """Implement data loaders of type torch.utils.data.DataLoader for training_set and testing_set."""
         pass
 

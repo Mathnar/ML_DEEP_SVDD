@@ -2,7 +2,7 @@ from torch.utils.data import Subset
 from base.torchvision_dataset import TorchvisionDataset
 from PIL import Image
 from torchvision.datasets import MNIST
-from .preprocessing import get_target_label_idx, global_contrast_normalization
+from utils.preprocessing import get_target_label_idx, global_contrast_normalization
 import torchvision.transforms as transforms
 
 class MNIST_Dataset(TorchvisionDataset):

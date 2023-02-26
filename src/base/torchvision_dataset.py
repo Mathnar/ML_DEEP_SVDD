@@ -9,9 +9,7 @@ class TorchvisionDataset(BaseADDataset):
         super().__init__(root)
 
     def loaders(self, batch_size: int, shuffle_train=True, shuffle_test=False, num_workers: int = 0) -> (
-            DataLoader, DataLoader):
-        train_loader = DataLoader(dataset=self.training_set, batch_size=batch_size, shuffle=shuffle_train,
-                                  num_workers=num_workers)
-        test_loader = DataLoader(dataset=self.testing_set, batch_size=batch_size, shuffle=shuffle_test,
-                                 num_workers=num_workers)
+            DataLoader):
+        train_loader = DataLoader(dataset=self.training_set, batch_size=batch_size, shuffle=shuffle_train)
+        test_loader = DataLoader(dataset=self.testing_set, batch_size=batch_size, shuffle=shuffle_test)
         return train_loader, test_loader

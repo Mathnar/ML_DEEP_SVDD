@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from base.base_net import BaseNet
 
 
@@ -9,10 +8,8 @@ class MNIST_LeNet(BaseNet):
 
     def __init__(self):
         super().__init__()
-
         self.rep_dim = 32
         self.pool = nn.MaxPool2d(2, 2)
-
         self.conv1 = nn.Conv2d(1, 8, 5, bias=False, padding=2)
         self.bn1 = nn.BatchNorm2d(8, eps=1e-04, affine=False)
         self.conv2 = nn.Conv2d(8, 4, 5, bias=False, padding=2)
@@ -30,21 +27,19 @@ class MNIST_LeNet(BaseNet):
 
 
 class MNIST_LeNet_Autoencoder(BaseNet):
-
     def __init__(self):
         super().__init__()
 
         self.rep_dim = 32
         self.pool = nn.MaxPool2d(2, 2)
-
-        # Encoder (must match the Deep SVDD network above)
+        '''Encoder'''
         self.conv1 = nn.Conv2d(1, 8, 5, bias=False, padding=2)
         self.bn1 = nn.BatchNorm2d(8, eps=1e-04, affine=False)
         self.conv2 = nn.Conv2d(8, 4, 5, bias=False, padding=2)
         self.bn2 = nn.BatchNorm2d(4, eps=1e-04, affine=False)
         self.fc1 = nn.Linear(4 * 7 * 7, self.rep_dim, bias=False)
 
-        # Decoder
+        '''Decoder'''
         self.deconv1 = nn.ConvTranspose2d(2, 4, 5, bias=False, padding=2)
         self.bn3 = nn.BatchNorm2d(4, eps=1e-04, affine=False)
         self.deconv2 = nn.ConvTranspose2d(4, 8, 5, bias=False, padding=3)

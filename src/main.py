@@ -20,7 +20,6 @@ dataset_name = config['dataset_name']
 net_name = config['net_name']
 xp_path = config['xp_path']
 data_path = config['data_path']
-load_config = config.get('load_config', None)
 load_model = config.get('load_model', None)
 objective = config.get('type', 'one-class')
 nu = config.get('v', 0.1)
@@ -39,7 +38,6 @@ ae_n_epochs = config.get('ae_n_epochs', 100)
 ae_lr_milestone = config.get('ae_lr_milestone', [0])
 ae_batch_size = config.get('ae_batch_size', 128)
 ae_weight_decay = config.get('ae_weight_decay', 1e-6)
-n_jobs_dataloader = config.get('n_jobs_dataloader', 0)
 normal_class = config.get('normal_class', 0)
 
 def main():
@@ -47,39 +45,25 @@ def main():
     outliners = None
     conf = Config(config)
     logger = start_logger()
-    if load_config:
-        conf.load_config(import_json=load_config)
-        logger.info('Configig: %s.' % load_config)
 
-    logger.info('Deep SVDD objective: %s' % conf.settings['type'])
-    logger.info('Nu-paramerter: %.2f' % conf.settings['v'])
-    if conf.settings['seed'] != -1:
-        random.seed(conf.settings['seed'])
-        np.random.seed(conf.settings['seed'])
-        torch.manual_seed(conf.settings['seed'])
-        logger.info('Set seed to %d.' % conf.settings['seed'])
+    logger.info('Deep SVDD objective f: %s' % conf.settings['type'])
+    logger.info('v: %.2f' % conf.settings['v'])
+
     if not torch.cuda.is_available():
         device = 'cpu'
     else:
         device = 'gpu'
-    logger.info('Computation device: %s' % device)
-    logger.info('Number of dataloader workers: %d' % n_jobs_dataloader)
+    logger.info('Device: %s' % device)
 
     # _____________________ Load dataset
     dataset = load_dataset(dataset_name, data_path, normal_class)
 
-    # Init Deep_svdd
+    # _____________________ Init Deep_svdd
     deep_SVDD = DeepSVDD(conf.settings['type'], conf.settings['v'])
     deep_SVDD.build_network(net_name)
 
-    if load_model:
-        deep_SVDD.load_model(model_path=load_model, load_ae=True)
-        logger.info('Loading model from %s.' % load_model)
-
-    logger.info('Pretraining: %s' % pretrain)
-
-    # Pretrain the model
     if pretrain:
+        logger.info('Pretraining: %s' % pretrain)
         pretrain_model(conf, dataset, deep_SVDD, device, logger)
 
     logger.info('Training optimizer: %s' % conf.settings['optimizer'])
@@ -95,10 +79,9 @@ def main():
                     lr_milestones=conf.settings['lr_milestone'],
                     batch_size=conf.settings['batch_size'],
                     weight_decay=conf.settings['weight_decay'],
-                    device=device,
-                    n_jobs_dataloader=n_jobs_dataloader)
+                    device=device)
 
-    deep_SVDD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
+    deep_SVDD.test(dataset, device=device)
 
     # Plot
     indices, labels, scores = zip(*deep_SVDD.results['test_scores'])
@@ -121,18 +104,18 @@ def extract_data_and_save(conf, dataset, deep_SVDD, idx_sorted, inliners, outlin
             outliners = torch.tensor(np.transpose(dataset.testing_set.data[idx_sorted[-32:], ...], (0, 3, 1, 2)))
 
         plot_imgs_tensor(inliners,
-                         export_img=xp_path + '/normals_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")),
+                         export_img=xp_path + '/'+objective + '_normals_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")),
                          title='Most normal imgs', padding=3)
         plot_imgs_tensor(outliners,
-                         export_img=xp_path + '/outliers_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")),
+                         export_img=xp_path + '/'+objective + '_outliers_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")),
                          title='Most anomalous imgs', padding=3)
     # Save results
     deep_SVDD.save_results(
-        export_json=xp_path + '/results_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.json')
+        export_json=xp_path + '/'+objective + '_results_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.json')
     deep_SVDD.save_model(
-        export_model=xp_path + '/model_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.tar')
+        export_model=xp_path + '/'+objective + '_model_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.tar')
     conf.save_config(
-        export_json=xp_path + '/cifar10_config_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.json')
+        export_json=xp_path + '/'+objective + '_'+dataset_name+'_config_' + str(datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")) + '.json')
 
 
 def pretrain_model(conf, dataset, deep_SVDD, device, logger):
@@ -148,8 +131,7 @@ def pretrain_model(conf, dataset, deep_SVDD, device, logger):
                        lr_milestones=conf.settings['ae_lr_milestone'],
                        batch_size=conf.settings['ae_batch_size'],
                        weight_decay=conf.settings['ae_weight_decay'],
-                       device=device,
-                       n_jobs_dataloader=n_jobs_dataloader)
+                       device=device)
 
 
 def start_logger():

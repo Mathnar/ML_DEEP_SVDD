@@ -13,10 +13,8 @@ import numpy as np
 class DeepSVDDTrainer(BaseTrainer):
 
     def __init__(self, objective, R, c, v, optimizer, lr, n_epochs,
-                 lr_milestones, batch_size, weight_decay, device,
-                 n_jobs_dataloader):
-        super().__init__(optimizer, lr, n_epochs, lr_milestones, batch_size, weight_decay, device,
-                         n_jobs_dataloader)
+                 lr_milestones, batch_size, weight_decay, device):
+        super().__init__(optimizer, lr, n_epochs, lr_milestones, batch_size, weight_decay, device)
 
         assert objective in ('one-class', 'soft-boundary'), "Objective must be either 'one-class' or 'soft-boundary'."
         self.objective = objective
@@ -24,7 +22,7 @@ class DeepSVDDTrainer(BaseTrainer):
         self.R = torch.tensor(R, device=self.device)
         self.c = torch.tensor(c, device=self.device) if c is not None else None
         self.nu = v
-        self.warm_up_n_epochs = 10
+        self.k = 10
         self.label_array = None
         self.score_array = None
         self.train_time = None
@@ -35,24 +33,22 @@ class DeepSVDDTrainer(BaseTrainer):
     def train(self, dataset: BaseADDataset, net):
         logger = logging.getLogger()
         net = net.to(self.device)
-        train_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        train_loader, _ = dataset.loaders(batch_size=self.batch_size)
         optimizer = optim.Adam(net.parameters(), lr=self.lr, weight_decay=self.weight_decay,
                                amsgrad=self.optimizer_name == 'amsgrad')
 
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
         if self.c is None:
-            logger.info('Initializing center c...')
+            logger.info('Init center c')
             self.c = self.init_center_c(train_loader, net)
-            logger.info('Center c initialized.')
+            logger.info('c initialized')
         logger.info('Starting training...')
         start_time = time.time()
         net.train()
         for epoch in range(self.n_epochs):
-
             scheduler.step()
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
-
             loss_epoch = 0.0
             n_batches = 0
             epoch_start_time = time.time()
@@ -69,9 +65,8 @@ class DeepSVDDTrainer(BaseTrainer):
                     loss = torch.mean(dist)
                 loss.backward()
                 optimizer.step()
-                if (self.objective == 'soft-boundary') and (epoch >= self.warm_up_n_epochs):
+                if (self.objective == 'soft-boundary') and (epoch >= self.k):
                     self.R.data = torch.tensor(get_radius(dist, self.nu), device=self.device)
-
                 loss_epoch += loss.item()
                 n_batches += 1
             epoch_train_time = time.time() - epoch_start_time
@@ -86,7 +81,7 @@ class DeepSVDDTrainer(BaseTrainer):
     def test(self, dataset: BaseADDataset, net: BaseNet):
         logger = logging.getLogger()
         net = net.to(self.device)
-        _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        _, test_loader = dataset.loaders(batch_size=self.batch_size)
         logger.info('Starting testing...')
         start_time = time.time()
         idx_label_score = []
@@ -143,5 +138,7 @@ class DeepSVDDTrainer(BaseTrainer):
         return c
 
 
-def get_radius(dist: torch.Tensor, nu: float):
-    return np.quantile(np.sqrt(dist.clone().data.cpu().numpy()), 1 - nu)
+def get_radius(dist, v):
+    return np.quantile(np.sqrt(dist.clone().data.cpu().numpy()), 1 - v)
+
+'''The radius is set such that the fraction of the training data that falls outside the hypersphere is at most v'''
